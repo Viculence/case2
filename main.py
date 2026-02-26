@@ -53,8 +53,16 @@ def find_system_info(text):
     IP addresses, email addresses and file paths.
     :return: {'ips': [], 'files': [], 'emails': []}
     '''
-    # Вика
-    pass
+    ip_regex = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
+    ips = re.findall(ip_regex, text)
+
+    file_regex = r"\b[\w\.-] + (?:\.txt|\.pdf|\.jpg|\.png|\.docx|\.xlsx)\b"
+    files = re.findall(file_regex, text)
+
+    email_regex = r"[a-zA-Z0-9._%+-] + @[a-zA-Z0-9.-] + \.[a-zA-Z]{2,}"
+    emails = re.findall(email_regex, text)
+
+    return{'ips': ips, 'files': files, 'emails': emails}
 
 
 # Role 4. Cryptanalyst
