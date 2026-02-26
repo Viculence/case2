@@ -5,6 +5,7 @@ import re
 import base64
 import codecs
 
+
 text = '''confidential_data.xlsx, super_secure_4187!, report.pdf, 
 10.0.0.1 - “GET /products?id=1’ OR ‘1’=’1” 10.0.0.50 - “POST /cart/add”, 
 bob.martin@example.com, pk_test_x4y7zBz5gHq2dTt3x8J9iK6lL1mN7A8, 
@@ -22,27 +23,69 @@ invoice_2017.docx, ROT13: Zlfgrel bs Pyhzf, 9876 5432 1098 7654
 
 # Role 1. Financial investigator
 # Task: to find and verify bank card numbers
-def find_and_validate_credit_cards(text):
-    ''' Finds the card numbers and verifies them using
+''' Finds the card numbers and verifies them using
     the Luna algorithm.
     :param text: Parts of the text containing information about
     credit cards numbers.
     :return: {'valid':[], 'invalid':[]}
     '''
-    # Мила
-    pass
+
+def find_and_validate_credit_cards(text):
+
+    card_pattern = r'\b(?:\d{4}[-\s]?){3}\d{4}\b'
+    potential_cards = re.findall(card_pattern, text)
+    valid_cards = []
+    invalid_cards = []
+    for card in potential_cards:
+        clear_number = re.sub(r'\D', '', card)
+        if len(clear_number) != 16:
+            invalid_cards.append(card)
+            continue
+        digits = [int(d) for d in clear_number]
+        check_digit = digits.pop()
+        digits.reverse()
+        processed_digits = []
+        for index, digit in enumerate(digits):
+            if index % 2 == 0:
+                doubled = digit * 2
+                if doubled > 9: doubled -= 9
+                processed_digits.append(doubled)
+            else:
+                processed_digits.append(digit)
+        if (sum(processed_digits) + check_digit) % 10 == 0:
+            valid_cards.append(card)
+        else:
+            invalid_cards.append(card)
+    return {'valid': valid_cards, 'invalid': invalid_cards}
 
 
 # Role 2. The Key Hunter
 # Task: find secret keys and passwords
-def find_secrets(text):
-    ''' Searches for API-keys, passwords and access tokens.
+''' Searches for API-keys, passwords and access tokens.
     :param text: Parts of the text containing information about
     keys, passwords and other secret data.
     :return: List of found secrets
     '''
-    # Мила
-    pass
+
+def find_secrets(text):
+
+    found_secrets = []
+    api_key_pattern = r'\b(?:sk_live_|pk_test_)[a-zA-Z0-9]+\b'
+
+    # находим API-ключи
+    found_secrets.extend(re.findall(api_key_pattern, text))
+
+    # находим пароли
+    words = text.split()
+    for word in words:
+        clean_word = word.strip('",.')
+        if (len(clean_word) > 6 and '@' not in clean_word and
+                not clean_word.startswith(('sk_live_', 'pk_test_'))):
+            has_digit = any(char.isdigit() for char in clean_word)
+            has_special = any(not char.isalnum() for char in clean_word)
+            if has_digit and has_special:
+                found_secrets.append(clean_word)
+    return list(set(found_secrets))
 
 
 # Role 3. System information traker
