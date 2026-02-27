@@ -31,6 +31,10 @@ invoice_2017.docx, ROT13: Zlfgrel bs Pyhzf, 9876 5432 1098 7654
     '''
 
 def find_and_validate_credit_cards(text):
+    # проверка, что получен текст из строк
+    if not isinstance(text, str):
+        print('Ошибка. Функция получила не текст')
+        return {'valid': [], 'invalid': []}
 
     card_pattern = r'\b(?:\d{4}[-\s]?){3}\d{4}\b'
     potential_cards = re.findall(card_pattern, text)
@@ -69,6 +73,10 @@ def find_and_validate_credit_cards(text):
 
 def find_secrets(text):
 
+    # проверка, что получен текст из строк
+    if not isinstance(text, str):
+        print('Ошибка. Функция получила не текст')
+        return []
     found_secrets = []
     api_key_pattern = r'\b(?:sk_live_|pk_test_)[a-zA-Z0-9]+\b'
 
@@ -79,11 +87,12 @@ def find_secrets(text):
     words = text.split()
     for word in words:
         clean_word = word.strip('",.')
-        if (len(clean_word) > 6 and '@' not in clean_word and
+        if (len(clean_word) > 12 and '@' not in clean_word and
                 not clean_word.startswith(('sk_live_', 'pk_test_'))):
             has_digit = any(char.isdigit() for char in clean_word)
             has_special = any(not char.isalnum() for char in clean_word)
-            if has_digit and has_special:
+            has_english_letter = any('a'<= char.lower() <= 'z' for char in clean_word)
+            if has_digit and has_special and has_english_letter:
                 found_secrets.append(clean_word)
     return list(set(found_secrets))
 
