@@ -1,6 +1,6 @@
 # Operation Data Shield
 # Developers: Yasminskaya V., Burykhina E., Tankova K.
-
+import binascii
 import re
 import base64
 import codecs
@@ -125,8 +125,40 @@ def decode_messages(text):
     in Base64, Hex or ROT13 format.
     :return: {'base64': [], 'hex': [], 'rot13': []}
     '''
+    import base64
+    import codecs
+    base64_list = []
+    hex_list = []
+    rot13_list = []
+    # base64
+    for word in text.split():
+        try:
+            decoded = base64.b64decode(word).decode('utf-8')
+            if decoded.isprintable():
+                base64_list.append(decoded)
+        except:
+            pass
+    # hex
+    for word in text.split():
+        try:
+            if word.startswith("0x"):
+                hex_string = word[2:]
+            elif word.startswith("\\x"):
+                hex_string = word.replace("\\x", "")
+            else:
+                continue
+
+            decoded = bytes.fromhex(hex_string).decode('utf-8')
+            hex_list.append(decoded)
+        except:
+            pass
+    # rot13
+    if "ROT13:" in text:
+        rot_text = text.split("ROT13:")[1].strip()
+        decoded = codecs.decode(rot_text, 'rot_13')
+        rot13_list.append(decoded)
+    return {'base64': base64_list,'hex': hex_list, 'rot13': rot13_list}
     # Карина
-    pass
 
 
 # Role 5. Log analyst
@@ -138,8 +170,44 @@ def analyze_logs(log_text):
     :return: {'sql_injections': [], 'xss_attempts': [],
     'suspicious_user_agents': [], 'failed_logins': []}
     '''
+    sql_injections = []
+    xss_attempts = []
+    suspicious_user_agents = []
+    failed_logins = []
+    lines = log_text.splitlines()
+    for line in lines:
+        lower_line = line.lower()
+        # sql_injections
+        if ("' or 1=1" in lower_line or
+                "union select" in lower_line or
+                "select *" in lower_line or
+                "drop table" in lower_line or
+                "--" in lower_line):
+            sql_injections.append(line)
+        # xss_attempts
+        if ("<script>" in lower_line or
+                "</script>" in lower_line or
+                "javascript:" in lower_line or
+                "onerror=" in lower_line or
+                "alert(" in lower_line):
+            xss_attempts.append(line)
+        # suspicious_user_agents
+        if ("sqlmap" in lower_line or
+                "nikto" in lower_line or
+                "nmap" in lower_line or
+                "curl" in lower_line or
+                "wget" in lower_line or
+                "python-requests" in lower_line):
+            suspicious_user_agents.append(line)
+
+        # failed_logins
+        if ("failed login" in lower_line or
+                "authentication failed" in lower_line or
+                "401 unauthorized" in lower_line):
+            failed_logins.append(line)
+
+    return {'sql_injections': sql_injections,'xss_attempts': xss_attempts,'suspicious_user_agents': suspicious_user_agents,'failed_logins': failed_logins}
     # Карина
-    pass
 
 
 # Role 6. Data quality engineer
