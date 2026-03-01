@@ -1,9 +1,11 @@
 # Operation Data Shield
 # Developers: Yasminskaya V., Burykhina E., Tankova K.
+
 import binascii
 import re
 import base64
 import codecs
+import datetime
 
 
 text = '''confidential_data.xlsx, super_secure_4187!, report.pdf, 
@@ -29,7 +31,6 @@ invoice_2017.docx, ROT13: Zlfgrel bs Pyhzf, 9876 5432 1098 7654
     credit cards numbers.
     :return: {'valid':[], 'invalid':[]}
     '''
-
 def find_and_validate_credit_cards(text):
     # проверка, что получен текст из строк
     if not isinstance(text, str):
@@ -70,7 +71,6 @@ def find_and_validate_credit_cards(text):
     keys, passwords and other secret data.
     :return: List of found secrets
     '''
-
 def find_secrets(text):
 
     # проверка, что получен текст из строк
@@ -105,14 +105,25 @@ def find_system_info(text):
     IP addresses, email addresses and file paths.
     :return: {'ips': [], 'files': [], 'emails': []}
     '''
-    ip_regex = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
-    ips = re.findall(ip_regex, text)
+    try:
+        ip_regex = r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
+        ips = re.findall(ip_regex, text)
 
-    file_regex = r"\b[\w\.-] + (?:\.txt|\.pdf|\.jpg|\.png|\.docx|\.xlsx)\b"
-    files = re.findall(file_regex, text)
+        file_regex = r"\b[\w\.-] + (?:\.txt|\.pdf|\.jpg|\.png|\.docx|\.xlsx)\b"
+        files = re.findall(file_regex, text)
 
-    email_regex = r"[a-zA-Z0-9._%+-] + @[a-zA-Z0-9.-] + \.[a-zA-Z]{2,}"
-    emails = re.findall(email_regex, text)
+        email_regex = r"[a-zA-Z0-9._%+-] + @[a-zA-Z0-9.-] + \.[a-zA-Z]{2,}"
+        emails = re.findall(email_regex, text)
+
+    except ValueError as e:
+        print(f"ValueError occurred: {e}")
+        ips, files, emails = [], [], []
+    except FileNotFoundError as e:
+        print(f"FileNotFoundError occurred: {e}")
+        ips, files, emails = [], [], []
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        ips, files, emails = [], [], []
 
     return{'ips': ips, 'files': files, 'emails': emails}
 
@@ -125,8 +136,6 @@ def decode_messages(text):
     in Base64, Hex or ROT13 format.
     :return: {'base64': [], 'hex': [], 'rot13': []}
     '''
-    import base64
-    import codecs
     base64_list = []
     hex_list = []
     rot13_list = []
@@ -158,7 +167,6 @@ def decode_messages(text):
         decoded = codecs.decode(rot_text, 'rot_13')
         rot13_list.append(decoded)
     return {'base64': base64_list,'hex': hex_list, 'rot13': rot13_list}
-    # Карина
 
 
 # Role 5. Log analyst
@@ -206,8 +214,10 @@ def analyze_logs(log_text):
                 "401 unauthorized" in lower_line):
             failed_logins.append(line)
 
-    return {'sql_injections': sql_injections,'xss_attempts': xss_attempts,'suspicious_user_agents': suspicious_user_agents,'failed_logins': failed_logins}
-    # Карина
+    return {'sql_injections': sql_injections,'xss_attempts': xss_attempts,
+            'suspicious_user_agents': suspicious_user_agents,
+            'failed_logins': failed_logins
+            }
 
 
 # Role 6. Data quality engineer
@@ -222,7 +232,85 @@ def normalize_and_validate(text):
     'cards': {'valid': [], 'invalid': []}
     }
     '''
-    # Вика
-    pass
+    phones = {'valid': [], 'invalid': []}
+    dates = {'normalized': [], 'invalid': []}
+    inn = {'valid': [], 'invalid': []}
+    cards = {'valid': [], 'invalid': []}
+
+    try:
+        phone_regex = (r"\+?\d{1, 4}?[-.\s]?\(?\d{1, 3}?\)?"
+                       r"[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}"
+                       )
+        phone_numbers = re.findall(phone_regex, text)
+        for phone in phone_numbers:
+            if validate_phone(phone):
+                phones['valid'].append(phone)
+            else:
+                phones['invalid'].append(phone)
+
+        date_regex = r"\d{2}[/-]\d{2}[/-]\d{4}"
+        dates_found = re.findall(date_regex, text)
+        for date in dates_found:
+            normalized_date = normalize_date(date)
+            if normalized_date != date:
+                dates['normalized'].append(normalized_date)
+            else:
+                dates['invalid'].append(date)
+
+        inn_regex = r"\b\d{10, 12}\b"
+        inn_numbers = re.findall(inn_regex, text)
+        for number in inn_numbers:
+            if validate_inn(number):
+                inn['valid'].append(number)
+            else:
+                inn['invalid'].append(number)
+
+        card_regex = r"\b(?:d{4}[- ]?){3}\d{4}\b"
+        cards_found = re.findall(card_regex, text)
+        for card in cards_found:
+            if validate_card(card):
+                cards['valid'].append(card)
+            else:
+                cards['invalid'].append(card)
+
+    except ValueError as e:
+        print(f"ValueError occurred: {e}")
+    except FileNotFoundError as e:
+        print(f"FileNotFoundError occurred: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+    return {'phones': phones, 'dates': dates, 'inn': inn, 'cards': cards}
 
 
+def validate_phone(phone):
+    phone_regex = (r"^\+?\d{1, 4}?[-.\s]?\(?\d{1, 3}?\)?"
+                   r"[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}[-.\s]?\d{1,4}$"
+                   )
+    return re.match(phone_regex, phone) is not None
+
+
+def validate_inn(inn):
+    return len(inn) in [10, 12] and inn.isdigit()
+
+
+def validate_card(card_number):
+    card_number = card_number.replace(" ", "").replace("-", "")
+    total = 0
+    reverse_digits = card_number[::-1]
+    for i, digit in enumerate(reverse_digits):
+        n = int(digit)
+        if i % 2 == 1:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return total % 10 == 0
+
+
+def normalize_date(date):
+    try:
+        date_obj = datetime.datetime.strptime(date, "%d/%m/%Y")
+        return date_obj.strftime("%Y-%m-%d")
+    except ValueError:
+        return date
