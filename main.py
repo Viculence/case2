@@ -92,7 +92,7 @@ def find_secrets(text):
             has_digit = any(char.isdigit() for char in clean_word)
             has_special = any(not char.isalnum() for char in clean_word)
             has_english_letter = any('a'<= char.lower() <= 'z' for char in clean_word)
-            if has_digit and has_special and has_english_letter:
+            if has_digit and has_special and has_english_letter and not clean_word.endswith(('.docx', '.pdf', '.txt', '.xlsx')):
                 found_secrets.append(clean_word)
     return list(set(found_secrets))
 
@@ -142,11 +142,12 @@ def decode_messages(text):
     # base64
     for word in text.split():
         try:
-            decoded = base64.b64decode(word).decode('utf-8')
-            if decoded.isprintable():
+            decoded_bytes = base64.b64decode(word, validate=True)
+            decoded = decoded_bytes.decode('utf-8')
+            if decoded.isprintable() and decoded.strip():
                 base64_list.append(decoded)
-        except:
-            pass
+        except (ValueError, UnicodeDecodeError):
+            continue
     # hex
     for word in text.split():
         try:
@@ -154,26 +155,33 @@ def decode_messages(text):
                 hex_string = word[2:]
             elif word.startswith("\\x"):
                 hex_string = word.replace("\\x", "")
+            elif all(c in "0123456789abcdefABCDEF" for c in word) \
+                and len(word) % 2 == 0 \
+                and len(word) >= 8:
+                    hex_string = word
             else:
                 continue
 
             decoded = bytes.fromhex(hex_string).decode('utf-8')
-            hex_list.append(decoded)
-        except:
-            pass
+            if decoded.strip() and decoded.isprintable():
+                hex_list.append(decoded)
+        except (ValueError, UnicodeDecodeError):
+            continue
     # rot13
-    if "ROT13:" in text:
-        rot_text = text.split("ROT13:")[1].strip()
-        decoded = codecs.decode(rot_text, 'rot_13')
-        rot13_list.append(decoded)
+    for line in text.splitlines():
+        if "ROT13:" in line:
+            rot_text = text.split("ROT13:")[1].split('\n')[0].strip()
+            if rot_text:
+                decoded = codecs.decode(rot_text, 'rot_13')
+                rot13_list.append(decoded)
     return {'base64': base64_list,'hex': hex_list, 'rot13': rot13_list}
 
 
 # Role 5. Log analyst
 # Task: validate logs for attacks
-def analyze_logs(log_text):
+def analyze_logs(text):
     ''' Analyzes the logs of the web server.
-    :param log_text: Parts of the text containing the logs of
+    :param text: Parts of the text containing the logs of
     web servers may also include requests for attacks.
     :return: {'sql_injections': [], 'xss_attempts': [],
     'suspicious_user_agents': [], 'failed_logins': []}
@@ -182,7 +190,8 @@ def analyze_logs(log_text):
     xss_attempts = []
     suspicious_user_agents = []
     failed_logins = []
-    lines = log_text.splitlines()
+
+    lines = text.splitlines()
     for line in lines:
         lower_line = line.lower()
         # sql_injections
@@ -238,8 +247,8 @@ def normalize_and_validate(text):
     cards = {'valid': [], 'invalid': []}
 
     try:
-        phone_regex = (r"\+?\d{1, 4}?[-.\s]?\(?\d{1, 3}?\)?"
-                       r"[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}"
+        phone_regex = (r"\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?"
+                       r"[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}"
                        )
         phone_numbers = re.findall(phone_regex, text)
         for phone in phone_numbers:
@@ -265,7 +274,7 @@ def normalize_and_validate(text):
             else:
                 inn['invalid'].append(number)
 
-        card_regex = r"\b(?:d{4}[- ]?){3}\d{4}\b"
+        card_regex = r"\b(?:\d{4}[- ]?){3}\d{4}\b"
         cards_found = re.findall(card_regex, text)
         for card in cards_found:
             if validate_card(card):
@@ -275,8 +284,6 @@ def normalize_and_validate(text):
 
     except ValueError as e:
         print(f"ValueError occurred: {e}")
-    except FileNotFoundError as e:
-        print(f"FileNotFoundError occurred: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
 
@@ -284,8 +291,8 @@ def normalize_and_validate(text):
 
 
 def validate_phone(phone):
-    phone_regex = (r"^\+?\d{1, 4}?[-.\s]?\(?\d{1, 3}?\)?"
-                   r"[-.\s]?\d{1, 4}[-.\s]?\d{1, 4}[-.\s]?\d{1,4}$"
+    phone_regex = (r"^\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?"
+                   r"[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}$"
                    )
     return re.match(phone_regex, phone) is not None
 
@@ -314,3 +321,114 @@ def normalize_date(date):
         return date_obj.strftime("%Y-%m-%d")
     except ValueError:
         return date
+
+
+def generate_comprehensive_report(text):
+    return {
+        'financial_data': find_and_validate_credit_cards(text),
+        'secrets': find_secrets(text),
+        'system_info': find_system_info(text),
+        'encoded_messages': decode_messages(text),
+        'security_threats': analyze_logs(text),
+        'normalized_data': normalize_and_validate(text)
+    }
+
+
+def print_and_save_report(report):
+
+    output_filename = 'result5.txt'
+
+    sections = [
+        ("ФИНАНСОВЫЕ ДАННЫЕ", report['financial_data']),
+        ("СЕКРЕТНЫЕ КЛЮЧИ", report['secrets']),
+        ("СИСТЕМНАЯ ИНФОРМАЦИЯ", report['system_info']),
+        ("РАСШИФРОВАННЫЕ СООБЩЕНИЯ", report['encoded_messages']),
+        ("УГРОЗЫ БЕЗОПАСНОСТИ", report['security_threats']),
+        ("НОРМАЛИЗОВАННЫЕ ДАННЫЕ", report['normalized_data'])
+    ]
+
+    try:
+        with open(output_filename, 'w', encoding='utf-8') as f:
+
+            unique_artifacts = set()
+
+            def log(text=""):
+                print(text)
+                f.write(str(text) + '\n')
+
+            def print_dict(d):
+                for key, val in d.items():
+
+                    if key == "valid":
+                        title = "валидные"
+                    elif key == "invalid":
+                        title = "невалидные"
+                    elif key == "normalized":
+                        title = "нормализованные"
+                    else:
+                        title = key
+
+                    if isinstance(val, dict):
+                        log(title)
+                        print_dict(val)
+
+                    elif isinstance(val, list):
+                        if val:
+                            log(title + ":")
+                            for item in val:
+                                log(str(item))
+                                unique_artifacts.add(str(item))
+                        else:
+                            log(title + ": (пусто)")
+
+                    else:
+                        log(f"{title}: {val}")
+
+            log('ОТЧЕТ ОПЕРАЦИИ DATA SHIELD\n')
+
+            total_count = 0
+
+            for title, data in sections:
+                log(title)
+
+                count = 0
+                if isinstance(data, list):
+                    count = len(data)
+                elif isinstance(data, dict):
+                    count = sum(len(v) for v in data.values() if isinstance(v, list))
+
+                total_count += count
+
+                log(f'Найдено: {count}\n')
+
+                if isinstance(data, list):
+                    for item in data:
+                        log(str(item))
+                        unique_artifacts.add(str(item))
+
+                elif isinstance(data, dict):
+
+                    print_dict(data)
+                log(f'Общее количество уникальных артефактов: {len(unique_artifacts)}')
+
+                log()  # пустая строка между разделами
+
+        print(f'Файл создан: {output_filename}')
+
+    except Exception as e:
+        print(f'Ошибка при сохранении: {e}')
+
+
+# ЗАПУСК
+if __name__ == '__main__':
+    input_file = 'input5.txt'
+
+    try:
+        with open(input_file, 'r', encoding='utf-8') as f:
+            text = f.read()
+
+        report = generate_comprehensive_report(text)
+        print_and_save_report(report)
+
+    except FileNotFoundError:
+        print(f'Файл {input_file} не найден')
