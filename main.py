@@ -96,14 +96,11 @@ def find_system_info(text):
         file_regex = r"\b[\w\.-]+(?:\.txt|\.pdf|\.jpg|\.png|\.docx|\.xlsx)\b"
         files = re.findall(file_regex, text)
 
-        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-] + \.[a-zA-Z]{2,}"
+        email_regex = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
         emails = re.findall(email_regex, text)
 
     except ValueError as e:
         print(f"ValueError occurred: {e}")
-        ips, files, emails = [], [], []
-    except FileNotFoundError as e:
-        print(f"FileNotFoundError occurred: {e}")
         ips, files, emails = [], [], []
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
@@ -230,70 +227,76 @@ def normalize_and_validate(text):
     inn = {'valid': [], 'invalid': []}
     cards = {'valid': [], 'invalid': []}
 
+    card_regex = r'\b\d{4}[\s-]\d{4}[\s-]\d{4}[\s-]\d{4}\b'
+    cards_found = re.findall(card_regex, text)
+    for card in cards_found:
+        if validate_card(card):
+            cards['valid'].append(card)
+        else:
+            cards['invalid'].append(card)
+
+    for number in re.findall(r'\b(\d{10}|\d{12})\b', text):
+        if validate_inn(number):
+            inn['valid'].append(number)
+        else:
+            inn['invalid'].append(number)
+
     try:
-        phone_regex = (r"\b(\+?(\d{1,4})[-.\s]?)?(\(?\d{1,3}\)?[-.\s]?)?"
-                       r"(\d{1,4})[-.\s]?(\d{1,4})[-.\s]?(\d{1,4})\b"
-                       )
-        phone_numbers = re.findall(phone_regex, text)
-        for phone in phone_numbers:
-            phone_number = ''.join(phone)
-            if validate_phone(phone_number):
-                phones['valid'].append(phone_number)
+        phone_patterns = [
+            r'\+\d{1,3}\s\d{2,3}\s\d{3,4}\s\d{2,4}(?:\s\d{2,4})?',
+            r'\b8-\d{3}-\d{3}-\d{2}-\d{2}\b',
+        ]
+        for match in re.finditer('|'.join(phone_patterns), text):
+            phone = match.group(0).strip()
+            if validate_phone(phone):
+                phones['valid'].append(phone)
             else:
-                phones['invalid'].append(phone_number)
-
-        date_regex = r"\b(\d{2})[/-\.](\d{2})[/-\.](\d{4})\b"
-        dates_found = re.findall(date_regex, text)
-        for date in dates_found:
-            formatted_date = f"{date[2]}-{date[1]}-{date[0]}"
-            normalized_date = normalize_date(formatted_date)
-            if normalized_date != formatted_date:
-                dates['normalized'].append(formatted_date)
-            else:
-                dates['invalid'].append(formatted_date)
-
-        inn_regex = r"\b\d{10,12}\b"
-        inn_numbers = re.findall(inn_regex, text)
-        for number in inn_numbers:
-            if validate_inn(number):
-                inn['valid'].append(number)
-            else:
-                inn['invalid'].append(number)
-
-        card_regex = r"\b(?:\d{4}[- ]?){3}\d{4}\b"
-        cards_found = re.findall(card_regex, text)
-        for card in cards_found:
-            if validate_card(card):
-                cards['valid'].append(card)
-            else:
-                cards['invalid'].append(card)
-
-    except ValueError as e:
-        print(f"ValueError occurred: {e}")
-    except FileNotFoundError as e:
-        print(f"FileNotFoundError occurred: {e}")
+                phones['invalid'].append(phone)
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Ошибка при обработке телефонов: {e}")
+
+    date_regex = r'\b(\d{2})[/.\-](\d{2})[/.\-](\d{4})\b'
+    for day, month, year in re.findall(date_regex, text):
+        try:
+            date_obj = datetime.datetime(int(year), int(month), int(day))
+            dates['normalized'].append(date_obj.strftime("%Y-%m-%d"))
+        except ValueError:
+            dates['invalid'].append(f"{day}.{month}.{year}")
+
+    for raw in re.findall(r'\b\d{1,2}-[A-Za-z]{3}-\d{4}\b', text):
+        try:
+            date_obj = datetime.datetime.strptime(raw, "%d-%b-%Y")
+            dates['normalized'].append(date_obj.strftime("%Y-%m-%d"))
+        except ValueError:
+            dates['invalid'].append(raw)
 
     return {'phones': phones, 'dates': dates, 'inn': inn, 'cards': cards}
 
 
 def validate_phone(phone):
-    phone_regex = (r"^\+?\(?\d{1,4}\)?[-.\s]?\(?\d{1,3}\)?"
-                   r"[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,4}$"
-                   )
-    return re.match(phone_regex, phone) is not None
+    digits = re.sub(r'\D', '', phone)
+    return 10 <= len(digits) <= 15
 
 
 def validate_inn(inn):
-    return len(inn) in [10, 12] and inn.isdigit()
+    if not inn.isdigit() or len(inn) not in (10, 12):
+        return False
+    def calc(s, coeffs):
+        return sum(int(s[i]) * c for i, c in enumerate(coeffs)) % 11 % 10
+    if len(inn) == 10:
+        return calc(inn, [2, 4, 10, 3, 5, 9, 4, 6, 8]) == int(inn[9])
+    if len(inn) == 12:
+        return (calc(inn, [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) == int(inn[10]) and
+                calc(inn, [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) == int(inn[11]))
+    return False
 
 
 def validate_card(card_number):
-    card_number = card_number.replace(" ", "").replace("-", "")
+    card_number = re.sub(r'\D', '', card_number)
+    if len(card_number) != 16:
+        return False
     total = 0
-    reverse_digits = card_number[::-1]
-    for i, digit in enumerate(reverse_digits):
+    for i, digit in enumerate(reversed(card_number)):
         n = int(digit)
         if i % 2 == 1:
             n *= 2
@@ -309,6 +312,14 @@ def normalize_date(date):
         return date_obj.strftime("%Y-%m-%d")
     except ValueError:
         return date
+
+
+def normalize_date_text(raw_date):
+    try:
+        date_obj = datetime.datetime.strptime(raw_date, "%d-%b-%Y")
+        return date_obj.strftime("%Y-%m-%d")
+    except ValueError:
+        return None
 
 
 def generate_comprehensive_report(text):
