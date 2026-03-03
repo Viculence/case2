@@ -6,7 +6,7 @@ bob.martin@example.com
 pk_test_x4y7zBz5gHq2dTt3x8J9iK6lL1mN7A8
 01.01.2011
 Base64: U29ycnlfb3VyX2JpbmFyeV9hY2Nlc3NfdXNl
-17-Jul-2009,
+17-Jul-2009
 jane_doe@personalmail.com
 4000 1234 5678 9876
 172.16.254.1
