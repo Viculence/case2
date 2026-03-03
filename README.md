@@ -1,5 +1,5 @@
 # Case 2
-Jperation "Data Shield"
+Operation "Data Shield"
 
 During Operation Data Shield, confidential data leaks were detected and analyzed. The team performed the following tasks to extract and process information from various texts and logs.
 
