@@ -1,0 +1,35 @@
+confidential_data.xlsx
+super_secure_4187!
+report.pdf
+10.0.0.1 - “GET /products?id=1’ OR ‘1’=’1” 10.0.0.50 - “POST /cart/add”
+bob.martin@example.com
+pk_test_x4y7zBz5gHq2dTt3x8J9iK6lL1mN7A8
+01.01.2011
+Base64: U29ycnlfb3VyX2JpbmFyeV9hY2Nlc3NfdXNl
+17-Jul-2009
+jane_doe@personalmail.com
+4000 1234 5678 9876
+172.16.254.1
+203.0.113.5
+203.0.113.5 - “GET /error/404” 192.168.1.100 - “GET /user?name=admin”
+1483 5672 8734 4391
+contact@mywebsite.org
+5901008664
+8-958-631-47-27
++44 20 7946 0857
+ROT13: Gbtrgure Vzntvfg
+admin@company.xyz
+7707083893
+5468697320697320612074657374206d657373616765
+129.267.1.4
+172.16.254.1
+letmein2694$
+10.0.0.25 - “GET /logout” 182.168.1.50 - “GET /register”
+172.16.0.1 - “GET /search?q=alert(‘xss’)” 214.0.149.10 - “GET /admin/login”
+9876 5432 1098 7654
+server_logs.txt
+28/04/2023
++1 800 555 35 20
+invoice_2017.docx
+ROT13: Zlfgrel bs Pyhzf
+9876 5432 1098 7654
